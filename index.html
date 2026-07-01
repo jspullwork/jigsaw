@@ -602,6 +602,16 @@
     let offsetX, offsetY;
     let lastClickTime = 0;
     let lastClickPos = { x: 0, y: 0 };
+    let isPinching = false;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+
+    function getPinchDist(touches) {
+      return Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+      );
+    }
 
     function shuffleUnlockedPieces() {
       const locked = pieces.filter(p => p.isLocked);
@@ -671,7 +681,35 @@
 
     canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (e.deltaY < 0) zoom = Math.min(zoom * 1.1, 4.0); else zoom = Math.max(zoom / 1.1, 0.5); draw(); }, { passive: false });
     canvas.addEventListener('mousedown', handleStart); window.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
-    canvas.addEventListener('touchstart', handleStart, { passive: false }); window.addEventListener('touchmove', handleMove, { passive: false }); window.addEventListener('touchend', handleEnd);
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        isPinching = true;
+        selectedPiece = null;
+        lastClickTime = 0;
+        pinchStartDist = getPinchDist(e.touches);
+        pinchStartZoom = zoom;
+        e.preventDefault();
+      } else {
+        isPinching = false;
+        handleStart(e);
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length === 2) {
+        const dist = getPinchDist(e.touches);
+        zoom = Math.min(4.0, Math.max(0.5, pinchStartZoom * (dist / pinchStartDist)));
+        draw();
+        e.preventDefault();
+      } else if (!isPinching) {
+        handleMove(e);
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) isPinching = false;
+      if (!isPinching) handleEnd();
+    });
     
     menuBtn.addEventListener('click', goToMenu);
     sortBtn.addEventListener('click', activateSort);
