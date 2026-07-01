@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JIGSAW 90 MAX</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0fbcf9">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Jigsaw 90">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #1e272e;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      box-sizing: border-box;
+      transition: background-color 0.3s;
+    }
+    body.fever-bg { background-color: #2c003e; }
+    
+    .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+    .screen.active { display: flex; }
+
+    /* 로비 화면 */
+    #menu-screen h1 { margin: 20px 0 10px 0; font-size: 2.2rem; color: #0fbcf9; text-shadow: 0 2px 4px rgba(0,0,0,0.5); text-align: center;}
+    #stage-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      width: 100%; max-width: 450px; overflow-y: auto; padding-bottom: 40px; height: calc(100vh - 100px);
+    }
+    #stage-grid::-webkit-scrollbar { width: 8px; }
+    #stage-grid::-webkit-scrollbar-thumb { background: #808e9b; border-radius: 4px; }
+    
+    .stage-btn {
+      background-color: #2d3436; border: 2px solid #808e9b; border-radius: 8px;
+      padding: 12px 4px; text-align: center; cursor: pointer;
+      transition: transform 0.1s, border-color 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .stage-btn:active { transform: scale(0.95); }
+    .stage-btn h3 { margin: 0 0 4px 0; font-size: 1.1rem; color: #0be881; }
+    .stage-btn .theme-txt { font-size: 0.75rem; margin-bottom: 4px; }
+    .stage-btn .pieces { font-size: 0.9rem; color: #d2dae2; margin-bottom: 6px; font-weight: bold;}
+    .stage-btn .highscore { font-size: 0.75rem; font-weight: bold; color: #ffd32a; }
+
+    /* 인게임 UI */
+    #header-info {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      width: 100%; max-width: 450px; margin: 5px 0;
+    }
+    .title-group { display: flex; flex-direction: column; gap: 4px; }
+    .title-group h2 { margin: 0; font-size: 1.4rem; color: #0fbcf9; }
+    .title-group #stage-text { font-size: 1rem; font-weight: bold; color: #ffd32a; }
+    
+    #score-display { font-size: 1.4rem; font-weight: bold; color: #0be881; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+    #fx-container {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; max-width: 450px; height: 30px; margin-bottom: 5px;
+    }
+    #combo-text { font-size: 1.3rem; font-weight: bold; color: #ffdd59; text-shadow: 0 0 8px rgba(255,221,89,0.8); transition: transform 0.1s ease; min-width: 120px; }
+    #fever-text { font-size: 1.3rem; font-weight: bold; color: #ff007f; text-shadow: 0 0 12px #ff007f; animation: blink 0.4s infinite alternate; display: none; text-align: right; }
+    @keyframes blink { 0% { opacity: 0.5; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1.05); } }
+    
+    #gauge-container {
+      width: 100%; max-width: 450px; height: 14px; background-color: #333; border-radius: 8px; margin-bottom: 10px;
+      overflow: hidden; border: 1px solid #555; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    }
+    #fever-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #f1c40f, #f39c12); transition: width 0.1s linear, background 0.3s; }
+    #fever-bar.fever-active { background: linear-gradient(90deg, #ff007f, #ff79c6); box-shadow: 0 0 10px #ff007f; }
+
+    /* 캔버스 & 컨테이너 수정 (테두리 오차 픽스) */
+    #canvas-container { 
+      position: relative; width: 100%; max-width: 450px; aspect-ratio: 3 / 4; 
+      border: 3px solid #808e9b; border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); 
+      transition: border-color 0.3s, box-shadow 0.3s; overflow: hidden;
+    }
+    #canvas-container.fever-border { border-color: #ff007f; box-shadow: 0 0 20px #ff007f; }
+    canvas { width: 100%; height: 100%; background-color: #2d3436; display: block; }
+    
+    .floating-score {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: bold; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      pointer-events: none; z-index: 100; animation: floatUp 0.8s ease-out forwards;
+    }
+    @keyframes floatUp { 0% { opacity: 1; margin-top: 0px; scale: 0.8; } 20% { scale: 1.2; } 100% { opacity: 0; margin-top: -80px; scale: 1; } }
+
+    /* 조작 버튼 */
+    #bottom-controls { display: flex; justify-content: space-between; width: 100%; max-width: 450px; margin-top: 15px; }
+    .btn { padding: 12px 20px; color: white; border: none; border-radius: 30px; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; }
+    #menu-btn { background-color: #808e9b; } #menu-btn:active { background-color: #4bcffa; }
+    #reset-btn { background-color: #ff3f34; } #reset-btn:active { background-color: #ff5e57; }
+    #sort-btn { background-color: #f9ca24; color: #1e272e; } #sort-btn:active { background-color: #f0932b; }
+    
+    #loading-overlay {
+      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7); color: white; font-size: 1.5rem; font-weight: bold;
+      align-items: center; justify-content: center; z-index: 80; border-radius: 8px;
+    }
+
+    /* 클리어 팝업 */
+    #clear-modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85); flex-direction: column; align-items: center; justify-content: center; z-index: 100;
+      cursor: pointer; transition: background-color 0.2s ease;
+    }
+    #clear-modal h3 { font-size: 2.5rem; color: #0be881; margin-bottom: 5px; text-shadow: 0 0 10px rgba(11,232,129,0.5); }
+    #final-score-text { font-size: 1.4rem; font-weight: bold; color: #ffd32a; margin-bottom: 10px; text-align: center; }
+    #hint-view-text { font-size: 0.9rem; color: #a4b0be; margin-bottom: 25px; animation: pulse 1s infinite alternate; }
+    @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+    
+    .modal-btn-group { display: flex; gap: 15px; }
+    .modal-btn { padding: 15px 25px; font-size: 1.2rem; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    #modal-menu-btn { background-color: #808e9b; }
+    #next-btn { background-color: #0fbcf9; }
+
+    #clear-modal.peek { background-color: rgba(0, 0, 0, 0) !important; }
+    #clear-modal.peek * { opacity: 0 !important; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div id="menu-screen" class="screen active">
+    <h1>JIGSAW 90 MAX</h1>
+    <div id="stage-grid"></div>
+  </div>
+
+  <div id="game-screen" class="screen">
+    <div id="header-info">
+      <div class="title-group">
+        <h2 id="stage-text">Stage 1 / 90</h2>
+      </div>
+      <div id="score-display">0 PTS</div>
+    </div>
+    
+    <div id="fx-container">
+      <div id="combo-text"></div>
+      <div id="fever-text">🔥 FEVER!</div>
+    </div>
+    
+    <div id="gauge-container">
+      <div id="fever-bar"></div>
+    </div>
+    
+    <div id="canvas-container">
+      <canvas id="puzzleCanvas" width="600" height="800"></canvas>
+      <div id="loading-overlay">Loading...</div>
+    </div>
+    
+    <div id="bottom-controls">
+      <button id="menu-btn" class="btn">Lobby</button>
+      <button id="sort-btn" class="btn">Sort</button>
+      <button id="reset-btn" class="btn">Restart</button>
+    </div>
+  </div>
+
+  <div id="clear-modal">
+    <h3 id="modal-title">Stage Clear!</h3>
+    <div id="final-score-text">Score: 0</div>
+    <div id="hint-view-text">💡 화면을 누르고 있으면 그림을 감상할 수 있습니다</div>
+    <div class="modal-btn-group">
+      <button id="modal-menu-btn" class="modal-btn">Lobby</button>
+      <button id="next-btn" class="modal-btn">Next Stage</button>
+    </div>
+  </div>
+
+  <script>
+    /* --- 이미지 풀 및 스테이지 생성 배열 --- */
+    const EASY_IMAGES = [
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800', 
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=800', 
+      'https://images.unsplash.com/photo-1511376777868-611b54f68947?q=80&w=800', 
+      'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?q=80&w=800', 
+      'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=800', 
+      'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800', 
+      'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=800', 
+      'https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=800', 
+      'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=800', 
+      'https://images.unsplash.com/photo-1505909182942-e2f09aee3e89?q=80&w=800'  
+    ];
+    const NORMAL_IMAGES = [
+      'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=80&w=800', 
+      'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=800', 
+      'https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=800', 
+      'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?q=80&w=800', 
+      'https://images.unsplash.com/photo-1433086966358-54859d0ed716?q=80&w=800', 
+      'https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?q=80&w=800', 
+      'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?q=80&w=800', 
+      'https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=800', 
+      'https://images.unsplash.com/photo-1500627869374-13cd993b1115?q=80&w=800', 
+      'https://images.unsplash.com/photo-1523731407965-2430cd12f5e4?q=80&w=800'  
+    ];
+    const HARD_IMAGES = [
+      'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=800', 
+      'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?q=80&w=800', 
+      'https://images.unsplash.com/photo-1473186578172-c141e6798ee4?q=80&w=800', 
+      'https://images.unsplash.com/photo-1444464666168-49b626f8a183?q=80&w=800', 
+      'https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=800', 
+      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=800', 
+      'https://images.unsplash.com/photo-1501854140801-50d01698950b?q=80&w=800', 
+      'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?q=80&w=800', 
+      'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?q=80&w=800', 
+      'https://images.unsplash.com/photo-1426604966848-d7adac402bff?q=80&w=800'  
+    ];
+
+    const STAGES = [];
+    let currentCols = 2; let currentRows = 2;
+    for(let step = 0; step < 30; step++) {
+      STAGES.push({ c: currentCols, r: currentRows, diff: 'easy' });
+      STAGES.push({ c: currentCols, r: currentRows, diff: 'normal' });
+      STAGES.push({ c: currentCols, r: currentRows, diff: 'hard' });
+      if (step % 2 === 0) currentRows++; else currentCols++;
+    }
+
+    /* --- DOM 선언 --- */
+    const menuScreen = document.getElementById('menu-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const stageGrid = document.getElementById('stage-grid');
+    const canvasContainer = document.getElementById('canvas-container');
+    const canvas = document.getElementById('puzzleCanvas');
+    const ctx = canvas.getContext('2d');
+    const stageText = document.getElementById('stage-text');
+    const scoreDisplay = document.getElementById('score-display');
+    const comboText = document.getElementById('combo-text');
+    const feverText = document.getElementById('fever-text');
+    const feverBar = document.getElementById('fever-bar');
+    const menuBtn = document.getElementById('menu-btn');
+    const sortBtn = document.getElementById('sort-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const clearModal = document.getElementById('clear-modal');
+    const modalMenuBtn = document.getElementById('modal-menu-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const finalScoreText = document.getElementById('final-score-text');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    /* --- 사운드 --- */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playComboSound(combo) {
+      const pentatonic = [261, 294, 330, 392, 440, 523, 587, 659, 784, 880, 988, 1047, 1175];
+      const freq = pentatonic[Math.min(combo - 1, pentatonic.length - 1)];
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+      osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.18);
+    }
+
+    function playFeverSound() {
+      const notes = [523, 659, 784, 1047];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.08);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.08 + 0.15);
+        osc.start(audioCtx.currentTime + i * 0.08);
+        osc.stop(audioCtx.currentTime + i * 0.08 + 0.15);
+      });
+    }
+
+    function playClearSound() {
+      const notes = [523, 659, 784, 1047, 1319];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.1 + 0.25);
+        osc.start(audioCtx.currentTime + i * 0.1);
+        osc.stop(audioCtx.currentTime + i * 0.1 + 0.25);
+      });
+    }
+
+    /* --- 상태 변수 --- */
+    let currentStageIndex = 0;
+    let COLS, ROWS, PIECE_WIDTH, PIECE_HEIGHT, TAB_SIZE, BASE_SNAP_DIST, currentSnapDist;
+    let pieces = [];
+    let selectedPiece = null;
+    let zoom = 1.0;
+    let stageScore = 0;
+    let comboCount = 0;
+    let feverGauge = 0;
+    let lastMatchTime = 0;
+    let isFeverMode = false;
+    let comboTimeout = null;
+    let feverDrainInterval = null;
+    let gaugeDrainInterval = null;
+
+    let highScores = JSON.parse(localStorage.getItem('jigsaw_90_highscores')) || new Array(90).fill(0);
+
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = 600; bgCanvas.height = 800;
+    const bgCtx = bgCanvas.getContext('2d');
+
+    /* --- 로비 --- */
+    function initMenu() {
+      stageGrid.innerHTML = '';
+      STAGES.forEach((config, index) => {
+        const btn = document.createElement('div');
+        btn.className = 'stage-btn';
+        const pieceCount = config.c * config.r;
+        const score = highScores[index];
+        const scoreText = score > 0 ? score.toLocaleString() : '-';
+
+        let themeColor, themeName;
+        if (config.diff === 'easy') { themeColor = '#85ef85'; themeName = "일러스트"; }
+        else if (config.diff === 'normal') { themeColor = '#f39c12'; themeName = "패턴/반복"; }
+        else { themeColor = '#ff4757'; themeName = "복잡한 뷰"; }
+
+        btn.innerHTML = `
+          <h3>St. ${index + 1}</h3>
+          <div class="theme-txt" style="color:${themeColor};">${themeName}</div>
+          <div class="pieces">${pieceCount} Pieces</div>
+          <div class="highscore">Best: ${scoreText}</div>
+        `;
+        btn.addEventListener('click', () => {
+          menuScreen.classList.remove('active');
+          gameScreen.classList.add('active');
+          loadStage(index);
+        });
+        stageGrid.appendChild(btn);
+      });
+    }
+
+    function goToMenu() {
+      clearModal.style.display = 'none';
+      gameScreen.classList.remove('active');
+      menuScreen.classList.add('active');
+      resetComboAndFever();
+      initMenu(); 
+    }
+
+    /* --- 스테이지 로딩 --- */
+    function loadStage(index) {
+      currentStageIndex = index;
+      const config = STAGES[index];
+      COLS = config.c; ROWS = config.r;
+      PIECE_WIDTH = canvas.width / COLS; PIECE_HEIGHT = canvas.height / ROWS;
+      TAB_SIZE = Math.min(PIECE_WIDTH, PIECE_HEIGHT) * 0.23;
+      BASE_SNAP_DIST = Math.max(15, Math.min(PIECE_WIDTH, PIECE_HEIGHT) * 0.4); 
+      currentSnapDist = BASE_SNAP_DIST;
+
+      stageText.innerText = `Stage ${index + 1} / 90`;
+      stageScore = 0; scoreDisplay.innerText = `${stageScore} PTS`;
+      
+      resetComboAndFever();
+      clearModal.style.display = 'none';
+      loadingOverlay.style.display = 'flex';
+
+      let imgUrl = '';
+      const loopIndex = Math.floor(index / 3) % 10;
+      if (config.diff === 'easy') imgUrl = EASY_IMAGES[loopIndex];
+      else if (config.diff === 'normal') imgUrl = NORMAL_IMAGES[loopIndex];
+      else imgUrl = HARD_IMAGES[loopIndex];
+
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.src = imgUrl;
+      
+      img.onload = () => {
+        const scale = Math.max(bgCanvas.width / img.width, bgCanvas.height / img.height);
+        const w = img.width * scale; const h = img.height * scale;
+        const x = (bgCanvas.width - w) / 2; const y = (bgCanvas.height - h) / 2;
+
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.drawImage(img, x, y, w, h);
+        bgCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        
+        initPieces(); loadingOverlay.style.display = 'none'; zoom = 1.0; draw();
+      };
+      
+      img.onerror = () => {
+        bgCtx.fillStyle = '#2c3e50'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.fillStyle = '#e74c3c'; bgCtx.font = 'bold 40px sans-serif'; bgCtx.textAlign = 'center';
+        bgCtx.fillText(`Image Error`, bgCanvas.width / 2, bgCanvas.height / 2);
+        initPieces(); loadingOverlay.style.display = 'none'; zoom = 1.0; draw();
+      }
+    }
+
+    function initPieces() {
+      pieces = []; const tabs = [];
+      for (let y = 0; y < ROWS; y++) {
+        tabs[y] = [];
+        for (let x = 0; x < COLS; x++) {
+          tabs[y][x] = {
+            top: y === 0 ? 0 : -tabs[y - 1][x].bottom, right: x === COLS - 1 ? 0 : (Math.random() > 0.5 ? 1 : -1),
+            bottom: y === ROWS - 1 ? 0 : (Math.random() > 0.5 ? 1 : -1), left: x === 0 ? 0 : -tabs[y][x - 1].right
+          };
+        }
+      }
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          pieces.push({
+            col: x, row: y, correctX: x * PIECE_WIDTH, correctY: y * PIECE_HEIGHT,
+            currentX: Math.random() * (canvas.width - PIECE_WIDTH), currentY: Math.random() * (canvas.height - PIECE_HEIGHT),
+            shape: tabs[y][x], isLocked: false
+          });
+        }
+      }
+    }
+
+    /* --- 게임 로직 --- */
+    function handleMatchAndScore() {
+      const now = Date.now();
+      let timeDiff = now - lastMatchTime;
+      let remainSec = 4.0;
+      if (comboCount === 0 || (timeDiff > 4000 && !isFeverMode)) { comboCount = 1; remainSec = 4.0; } 
+      else { comboCount++; remainSec = Math.max(0.1, (4000 - timeDiff) / 1000); }
+      lastMatchTime = now;
+
+      const stagePoint = currentStageIndex + 1;
+      const feverMult = isFeverMode ? 2 : 1;
+      const earnedScore = Math.round(stagePoint * remainSec * feverMult * 100);
+      
+      stageScore += earnedScore;
+      scoreDisplay.innerText = `${stageScore.toLocaleString()} PTS`;
+      showFloatingScore(earnedScore);
+
+      let justActivatedFever = false;
+      if (!isFeverMode) {
+        let fillAmount = 15;
+        if (comboCount > 1) { fillAmount = 40 - (timeDiff / 100); if (fillAmount < 10) fillAmount = 10; if (fillAmount > 40) fillAmount = 40; }
+        feverGauge += fillAmount;
+        if (feverGauge >= 100) { feverGauge = 100; justActivatedFever = true; activateFeverMode(); }
+        else { updateGaugeUI(); startGaugeDrain(); }
+      } else {
+        feverGauge = Math.min(100, feverGauge + 7);
+        updateGaugeUI();
+      }
+
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!justActivatedFever) {
+        if (isFeverMode) playFeverSound(); else playComboSound(comboCount);
+      }
+      comboText.innerText = `🔥 ${comboCount} COMBO`; comboText.style.transform = 'scale(1.3)';
+      setTimeout(() => comboText.style.transform = 'scale(1)', 100);
+
+      clearTimeout(comboTimeout);
+      if (!isFeverMode) {
+        comboTimeout = setTimeout(() => { comboCount = 0; comboText.innerText = ''; }, 4000);
+      }
+    }
+
+    function showFloatingScore(score) {
+      const el = document.createElement('div');
+      el.className = 'floating-score'; el.innerText = `+${score}`;
+      el.style.color = isFeverMode ? '#ff007f' : '#ffdd59';
+      canvasContainer.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+
+    function activateFeverMode() {
+      playFeverSound();
+      isFeverMode = true; feverText.style.display = 'block';
+      document.body.classList.add('fever-bg'); canvasContainer.classList.add('fever-border'); feverBar.classList.add('fever-active');
+      currentSnapDist = BASE_SNAP_DIST * 3;
+      clearTimeout(comboTimeout); clearInterval(feverDrainInterval); clearInterval(gaugeDrainInterval);
+      feverDrainInterval = setInterval(() => {
+        feverGauge -= 100 / 70; 
+        if (feverGauge <= 0) { feverGauge = 0; deactivateFeverMode(); }
+        updateGaugeUI();
+      }, 100);
+    }
+
+    function deactivateFeverMode() {
+      isFeverMode = false; feverText.style.display = 'none';
+      document.body.classList.remove('fever-bg'); canvasContainer.classList.remove('fever-border'); feverBar.classList.remove('fever-active');
+      currentSnapDist = BASE_SNAP_DIST; comboCount = 0; feverGauge = 0; comboText.innerText = '';
+      clearInterval(feverDrainInterval); updateGaugeUI();
+      startGaugeDrain();
+    }
+
+    function updateGaugeUI() { feverBar.style.width = `${feverGauge}%`; }
+
+    function startGaugeDrain() {
+      clearInterval(gaugeDrainInterval);
+      gaugeDrainInterval = setInterval(() => {
+        if (feverGauge <= 0) { feverGauge = 0; clearInterval(gaugeDrainInterval); updateGaugeUI(); return; }
+        feverGauge = Math.max(0, feverGauge - 0.3);
+        updateGaugeUI();
+      }, 100);
+    }
+
+    function resetComboAndFever() { clearTimeout(comboTimeout); clearInterval(feverDrainInterval); clearInterval(gaugeDrainInterval); deactivateFeverMode(); }
+
+    /* --- 캔버스 렌더링 --- */
+    function tracePiecePath(ctx, piece, x, y) {
+      ctx.beginPath(); ctx.moveTo(x, y);
+      if (piece.shape.top === 0) ctx.lineTo(x + PIECE_WIDTH, y);
+      else { ctx.lineTo(x + PIECE_WIDTH / 2 - TAB_SIZE, y); ctx.bezierCurveTo(x + PIECE_WIDTH / 2 - TAB_SIZE, y - piece.shape.top * TAB_SIZE * 1.5, x + PIECE_WIDTH / 2 + TAB_SIZE, y - piece.shape.top * TAB_SIZE * 1.5, x + PIECE_WIDTH / 2 + TAB_SIZE, y); ctx.lineTo(x + PIECE_WIDTH, y); }
+      if (piece.shape.right === 0) ctx.lineTo(x + PIECE_WIDTH, y + PIECE_HEIGHT);
+      else { ctx.lineTo(x + PIECE_WIDTH, y + PIECE_HEIGHT / 2 - TAB_SIZE); ctx.bezierCurveTo(x + PIECE_WIDTH + piece.shape.right * TAB_SIZE * 1.5, y + PIECE_HEIGHT / 2 - TAB_SIZE, x + PIECE_WIDTH + piece.shape.right * TAB_SIZE * 1.5, y + PIECE_HEIGHT / 2 + TAB_SIZE, x + PIECE_WIDTH, y + PIECE_HEIGHT / 2 + TAB_SIZE); ctx.lineTo(x + PIECE_WIDTH, y + PIECE_HEIGHT); }
+      if (piece.shape.bottom === 0) ctx.lineTo(x, y + PIECE_HEIGHT);
+      else { ctx.lineTo(x + PIECE_WIDTH / 2 + TAB_SIZE, y + PIECE_HEIGHT); ctx.bezierCurveTo(x + PIECE_WIDTH / 2 + TAB_SIZE, y + PIECE_HEIGHT + piece.shape.bottom * TAB_SIZE * 1.5, x + PIECE_WIDTH / 2 - TAB_SIZE, y + PIECE_HEIGHT + piece.shape.bottom * TAB_SIZE * 1.5, x + PIECE_WIDTH / 2 - TAB_SIZE, y + PIECE_HEIGHT); ctx.lineTo(x, y + PIECE_HEIGHT); }
+      if (piece.shape.left === 0) ctx.lineTo(x, y);
+      else { ctx.lineTo(x, y + PIECE_HEIGHT / 2 + TAB_SIZE); ctx.bezierCurveTo(x - piece.shape.left * TAB_SIZE * 1.5, y + PIECE_HEIGHT / 2 + TAB_SIZE, x - piece.shape.left * TAB_SIZE * 1.5, y + PIECE_HEIGHT / 2 - TAB_SIZE, x, y + PIECE_HEIGHT / 2 - TAB_SIZE); ctx.lineTo(x, y); }
+      ctx.closePath();
+    }
+
+    function drawPiece(piece) {
+      ctx.save(); tracePiecePath(ctx, piece, piece.currentX, piece.currentY); ctx.clip();
+      const margin = TAB_SIZE * 2;
+      ctx.drawImage(bgCanvas, piece.correctX - margin, piece.correctY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2, piece.currentX - margin, piece.currentY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2);
+      const isSelected = piece === selectedPiece;
+      ctx.lineWidth = piece.isLocked ? 1 : isSelected ? 5 : 2;
+      if (COLS > 10) ctx.lineWidth = piece.isLocked ? 0.5 : isSelected ? 3.5 : 1;
+      ctx.strokeStyle = piece.isLocked ? 'rgba(255,255,255,0.1)' : isSelected ? '#ffffff' : 'rgba(255,255,255,0.8)';
+      if (isSelected) { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 20; }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    function draw() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2; const cy = canvas.height / 2;
+      ctx.translate(cx, cy); ctx.scale(zoom, zoom); ctx.translate(-cx, -cy);
+      
+      ctx.globalAlpha = 0.2; ctx.drawImage(bgCanvas, 0, 0); ctx.globalAlpha = 1.0;
+      pieces.filter(p => p.isLocked).forEach(drawPiece); 
+      pieces.filter(p => !p.isLocked).forEach(drawPiece);
+    }
+
+    /* --- Sort 아이템 --- */
+    function activateSort() {
+      zoom = 0.5;
+      const gap = 15;
+      const pw = PIECE_WIDTH, ph = PIECE_HEIGHT;
+      const targets = [];
+
+      const groups = { tl: [], tr: [], bl: [], br: [], top: [], bottom: [], left: [], right: [], inner: [] };
+      pieces.filter(p => !p.isLocked).forEach(p => {
+        const t = p.row === 0, b = p.row === ROWS - 1;
+        const l = p.col === 0, r = p.col === COLS - 1;
+        if      (t && l) groups.tl.push(p);
+        else if (t && r) groups.tr.push(p);
+        else if (b && l) groups.bl.push(p);
+        else if (b && r) groups.br.push(p);
+        else if (t)      groups.top.push(p);
+        else if (b)      groups.bottom.push(p);
+        else if (l)      groups.left.push(p);
+        else if (r)      groups.right.push(p);
+        else             groups.inner.push(p);
+      });
+
+      const rnd = (min, max) => Math.random() * (max - min) + min;
+      function addTarget(p, tx, ty) {
+        targets.push({ piece: p, sx: p.currentX, sy: p.currentY, tx, ty });
+      }
+
+      // 코너 — 해당 모서리 바깥 영역에 랜덤 배치
+      if (groups.tl[0]) addTarget(groups.tl[0], rnd(-pw * 1.3, -pw * 0.2), rnd(-ph * 1.3, -ph * 0.2));
+      if (groups.tr[0]) addTarget(groups.tr[0], rnd(600 + pw * 0.2, 600 + pw * 1.3), rnd(-ph * 1.3, -ph * 0.2));
+      if (groups.bl[0]) addTarget(groups.bl[0], rnd(-pw * 1.3, -pw * 0.2), rnd(800 + ph * 0.2, 800 + ph * 1.3));
+      if (groups.br[0]) addTarget(groups.br[0], rnd(600 + pw * 0.2, 600 + pw * 1.3), rnd(800 + ph * 0.2, 800 + ph * 1.3));
+
+      // 상단 엣지 — 퍼즐 위쪽 바깥에 랜덤 산포
+      groups.top.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(-ph * 1.4, -ph * 0.2)));
+      // 하단 엣지
+      groups.bottom.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(800 + ph * 0.2, 800 + ph * 1.4)));
+      // 좌측 엣지
+      groups.left.forEach(p => addTarget(p, rnd(-pw * 1.4, -pw * 0.2), rnd(0, 800 - ph)));
+      // 우측 엣지
+      groups.right.forEach(p => addTarget(p, rnd(600 + pw * 0.2, 600 + pw * 1.4), rnd(0, 800 - ph)));
+
+      // 내부 조각 — 중앙 영역에 랜덤 산포
+      groups.inner.forEach(p => addTarget(p, rnd(pw * 0.5, 600 - pw * 1.5), rnd(ph * 0.5, 800 - ph * 1.5)));
+
+      // 애니메이션
+      const duration = 500, start = Date.now();
+      function step() {
+        const t = Math.min((Date.now() - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        targets.forEach(({ piece, sx, sy, tx, ty }) => {
+          piece.currentX = sx + (tx - sx) * ease;
+          piece.currentY = sy + (ty - sy) * ease;
+        });
+        draw();
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    /* --- 이벤트 핸들링 (좌표 오차 및 버그 픽스) --- */
+    let offsetX, offsetY;
+    let lastClickTime = 0;
+    let lastClickPos = { x: 0, y: 0 };
+
+    function shuffleUnlockedPieces() {
+      const locked = pieces.filter(p => p.isLocked);
+      const unlocked = pieces.filter(p => !p.isLocked);
+      if (unlocked.length < 2) return;
+      for (let i = unlocked.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unlocked[i], unlocked[j]] = [unlocked[j], unlocked[i]];
+      }
+      pieces.length = 0;
+      locked.forEach(p => pieces.push(p));
+      unlocked.forEach(p => pieces.push(p));
+      draw();
+    }
+
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const scaleX = canvas.width / rect.width; 
+      const scaleY = canvas.height / rect.height;
+      
+      // 테두리가 canvas-container로 넘어갔으므로 rect.left는 순수 캔버스 시작점을 의미
+      const rawX = (clientX - rect.left) * scaleX; 
+      const rawY = (clientY - rect.top) * scaleY;
+      const cx = canvas.width / 2; const cy = canvas.height / 2;
+      return { x: (rawX - cx) / zoom + cx, y: (rawY - cy) / zoom + cy };
+    }
+
+    function handleStart(e) {
+      const pos = getPointerPos(e);
+      const now = Date.now();
+      const dist = Math.hypot(pos.x - lastClickPos.x, pos.y - lastClickPos.y);
+      if (now - lastClickTime < 300 && dist < 20) {
+        lastClickTime = 0;
+        shuffleUnlockedPieces();
+        return;
+      }
+      lastClickTime = now;
+      lastClickPos = { x: pos.x, y: pos.y };
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      for (let i = pieces.length - 1; i >= 0; i--) {
+        const p = pieces[i]; if (p.isLocked) continue;
+        tracePiecePath(ctx, p, p.currentX, p.currentY);
+        if (ctx.isPointInPath(pos.x, pos.y)) {
+          selectedPiece = p; offsetX = pos.x - p.currentX; offsetY = pos.y - p.currentY;
+          pieces.splice(i, 1); pieces.push(selectedPiece); break;
+        }
+      }
+    }
+
+    function handleMove(e) { if (!selectedPiece) return; e.preventDefault(); const pos = getPointerPos(e); selectedPiece.currentX = pos.x - offsetX; selectedPiece.currentY = pos.y - offsetY; draw(); }
+
+    function handleEnd() {
+      if (selectedPiece) {
+        const dist = Math.hypot(selectedPiece.currentX - selectedPiece.correctX, selectedPiece.currentY - selectedPiece.correctY);
+        if (dist < currentSnapDist) {
+          selectedPiece.currentX = selectedPiece.correctX;
+          selectedPiece.currentY = selectedPiece.correctY;
+          selectedPiece.isLocked = true;
+          handleMatchAndScore(); 
+        }
+        selectedPiece = null; draw(); checkWin();
+      }
+    }
+
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (e.deltaY < 0) zoom = Math.min(zoom * 1.1, 4.0); else zoom = Math.max(zoom / 1.1, 0.5); draw(); }, { passive: false });
+    canvas.addEventListener('mousedown', handleStart); window.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, { passive: false }); window.addEventListener('touchmove', handleMove, { passive: false }); window.addEventListener('touchend', handleEnd);
+    
+    menuBtn.addEventListener('click', goToMenu);
+    sortBtn.addEventListener('click', activateSort);
+    resetBtn.addEventListener('click', () => loadStage(currentStageIndex));
+    modalMenuBtn.addEventListener('click', goToMenu);
+    nextBtn.addEventListener('click', () => { if (currentStageIndex < STAGES.length - 1) loadStage(currentStageIndex + 1); else goToMenu(); });
+
+    /* --- 클리어 팝업 기능 --- */
+    function checkWin() {
+      if (pieces.length > 0 && pieces.every(p => p.isLocked)) {
+        setTimeout(() => {
+          resetComboAndFever();
+          zoom = 1.0; draw();
+          playClearSound();
+          let isNewRecord = false;
+          if (stageScore > highScores[currentStageIndex]) {
+            highScores[currentStageIndex] = stageScore;
+            localStorage.setItem('jigsaw_90_highscores', JSON.stringify(highScores));
+            isNewRecord = true;
+          }
+          document.getElementById('modal-title').innerText = currentStageIndex === STAGES.length - 1 ? "ALL CLEAR!" : "Stage Clear!";
+          finalScoreText.innerHTML = `Score: ${stageScore.toLocaleString()} PTS<br>` + 
+                                     (isNewRecord ? `<span style="color:#ff007f; font-size:1rem;">(New Record!)</span>` : `<span style="color:#808e9b; font-size:1rem;">(Best: ${highScores[currentStageIndex].toLocaleString()})</span>`);
+          
+          document.getElementById('next-btn').innerText = currentStageIndex === STAGES.length - 1 ? "로비로" : "Next Stage";
+          clearModal.style.display = 'flex';
+        }, 300);
+      }
+    }
+
+    function startPeek(e) { if (e.target.tagName === 'BUTTON' || e.target.closest('.modal-btn')) return; clearModal.classList.add('peek'); }
+    function endPeek() { clearModal.classList.remove('peek'); }
+    clearModal.addEventListener('mousedown', startPeek); clearModal.addEventListener('touchstart', startPeek);
+    window.addEventListener('mouseup', endPeek); window.addEventListener('touchend', endPeek);
+
+    // 구동
+    initMenu();
+
+    // 서비스워커 등록
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

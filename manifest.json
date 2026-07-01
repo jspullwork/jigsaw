@@ -1,0 +1,24 @@
+{
+  "name": "JIGSAW 90 MAX",
+  "short_name": "Jigsaw 90",
+  "description": "아케이드 직소 퍼즐 게임 90스테이지",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1e272e",
+  "theme_color": "#0fbcf9",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
