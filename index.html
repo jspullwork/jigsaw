@@ -658,7 +658,9 @@
         const p = pieces[i]; if (p.isLocked) continue;
         tracePiecePath(ctx, p, p.currentX, p.currentY);
         if (ctx.isPointInPath(pos.x, pos.y)) {
-          selectedPiece = p; offsetX = pos.x - p.currentX; offsetY = pos.y - p.currentY;
+          selectedPiece = p;
+          offsetX = pos.x - p.currentX;
+          offsetY = PIECE_HEIGHT;
           pieces.splice(i, 1); pieces.push(selectedPiece); break;
         }
       }
