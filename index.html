@@ -515,16 +515,33 @@
     }
 
     function drawPiece(piece) {
-      ctx.save(); tracePiecePath(ctx, piece, piece.currentX, piece.currentY); ctx.clip();
-      const margin = TAB_SIZE * 2;
-      ctx.drawImage(bgCanvas, piece.correctX - margin, piece.correctY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2, piece.currentX - margin, piece.currentY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2);
       const isSelected = piece === selectedPiece;
-      ctx.lineWidth = piece.isLocked ? 1 : isSelected ? 5 : 2;
-      if (COLS > 10) ctx.lineWidth = piece.isLocked ? 0.5 : isSelected ? 3.5 : 1;
-      ctx.strokeStyle = piece.isLocked ? 'rgba(255,255,255,0.1)' : isSelected ? '#ffffff' : 'rgba(255,255,255,0.8)';
-      if (isSelected) { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 20; }
+      const margin = TAB_SIZE * 2;
+
+      // 이미지 클립 렌더링
+      ctx.save();
+      tracePiecePath(ctx, piece, piece.currentX, piece.currentY);
+      ctx.clip();
+      ctx.drawImage(bgCanvas, piece.correctX - margin, piece.correctY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2, piece.currentX - margin, piece.currentY - margin, PIECE_WIDTH + margin * 2, PIECE_HEIGHT + margin * 2);
+      ctx.restore();
+
+      // 테두리 렌더링 (클립 없이)
+      ctx.save();
+      tracePiecePath(ctx, piece, piece.currentX, piece.currentY);
+      ctx.lineWidth = piece.isLocked ? 1 : isSelected ? 5 : 3;
+      if (COLS > 10) ctx.lineWidth = piece.isLocked ? 0.5 : isSelected ? 3.5 : 2;
+      if (piece.isLocked) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      } else if (isSelected) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 20;
+      } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 6;
+      }
       ctx.stroke();
-      ctx.shadowBlur = 0;
       ctx.restore();
     }
 
@@ -566,19 +583,19 @@
       }
 
       // 코너 — 해당 모서리 바깥 영역에 랜덤 배치
-      if (groups.tl[0]) addTarget(groups.tl[0], rnd(-pw * 1.3, -pw * 0.2), rnd(-ph * 1.3, -ph * 0.2));
-      if (groups.tr[0]) addTarget(groups.tr[0], rnd(600 + pw * 0.2, 600 + pw * 1.3), rnd(-ph * 1.3, -ph * 0.2));
-      if (groups.bl[0]) addTarget(groups.bl[0], rnd(-pw * 1.3, -pw * 0.2), rnd(800 + ph * 0.2, 800 + ph * 1.3));
-      if (groups.br[0]) addTarget(groups.br[0], rnd(600 + pw * 0.2, 600 + pw * 1.3), rnd(800 + ph * 0.2, 800 + ph * 1.3));
+      if (groups.tl[0]) addTarget(groups.tl[0], rnd(-pw * 1.3, -pw * 1.0), rnd(-ph * 1.3, -ph * 1.0));
+      if (groups.tr[0]) addTarget(groups.tr[0], rnd(600 + pw * 0.1, 600 + pw * 0.4), rnd(-ph * 1.3, -ph * 1.0));
+      if (groups.bl[0]) addTarget(groups.bl[0], rnd(-pw * 1.3, -pw * 1.0), rnd(800 + ph * 0.1, 800 + ph * 0.4));
+      if (groups.br[0]) addTarget(groups.br[0], rnd(600 + pw * 0.1, 600 + pw * 0.4), rnd(800 + ph * 0.1, 800 + ph * 0.4));
 
       // 상단 엣지 — 퍼즐 위쪽 바깥에 랜덤 산포
-      groups.top.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(-ph * 1.4, -ph * 0.2)));
+      groups.top.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(-ph * 1.3, -ph * 1.0)));
       // 하단 엣지
-      groups.bottom.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(800 + ph * 0.2, 800 + ph * 1.4)));
+      groups.bottom.forEach(p => addTarget(p, rnd(0, 600 - pw), rnd(800 + ph * 0.1, 800 + ph * 0.4)));
       // 좌측 엣지
-      groups.left.forEach(p => addTarget(p, rnd(-pw * 1.4, -pw * 0.2), rnd(0, 800 - ph)));
+      groups.left.forEach(p => addTarget(p, rnd(-pw * 1.3, -pw * 1.0), rnd(0, 800 - ph)));
       // 우측 엣지
-      groups.right.forEach(p => addTarget(p, rnd(600 + pw * 0.2, 600 + pw * 1.4), rnd(0, 800 - ph)));
+      groups.right.forEach(p => addTarget(p, rnd(600 + pw * 0.1, 600 + pw * 0.4), rnd(0, 800 - ph)));
 
       // 내부 조각 — 중앙 영역에 랜덤 산포
       groups.inner.forEach(p => addTarget(p, rnd(pw * 0.5, 600 - pw * 1.5), rnd(ph * 0.5, 800 - ph * 1.5)));
